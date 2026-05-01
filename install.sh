@@ -34,16 +34,26 @@ echo ""
 mkdir -p "$HOOKS_DIR" "$AGENTS_DIR"
 echo "[OK] Directories: $HOOKS_DIR, $AGENTS_DIR"
 
-# --- Hook script ---
+# --- Hook scripts ---
 HOOK_SRC="$(dirname "$0")/hooks/external-agent-intercept.sh"
 HOOK_DST="${HOOKS_DIR}/external-agent-intercept.sh"
+NOTIFY_SRC="$(dirname "$0")/hooks/bg-agent-notify.sh"
+NOTIFY_DST="${HOOKS_DIR}/bg-agent-notify.sh"
 
 if [ -f "$HOOK_DST" ] && [ "$FORCE" != true ]; then
-  echo "[SKIP] Hook already exists: $HOOK_DST (use --force to overwrite)"
+  echo "[SKIP] Intercept hook exists: $HOOK_DST (use --force to overwrite)"
 else
   cp "$HOOK_SRC" "$HOOK_DST"
   chmod +x "$HOOK_DST"
-  echo "[OK]   Hook installed: $HOOK_DST"
+  echo "[OK]   Intercept hook: $HOOK_DST"
+fi
+
+if [ -f "$NOTIFY_DST" ] && [ "$FORCE" != true ]; then
+  echo "[SKIP] Notify hook exists: $NOTIFY_DST (use --force to overwrite)"
+else
+  cp "$NOTIFY_SRC" "$NOTIFY_DST"
+  chmod +x "$NOTIFY_DST"
+  echo "[OK]   Notify hook: $NOTIFY_DST"
 fi
 
 # --- Agent definitions ---
@@ -84,11 +94,10 @@ if [ -z "$SETTINGS_TO_UPDATE" ]; then
   exit 0
 fi
 
-# Check if hook already registered
+# Check if PreToolUse hook already registered
 if grep -q "external-agent-intercept" "$SETTINGS_TO_UPDATE" 2>/dev/null; then
-  echo "[SKIP] Hook already registered in $SETTINGS_TO_UPDATE"
+  echo "[SKIP] PreToolUse hook already registered in $SETTINGS_TO_UPDATE"
 else
-  # Use jq to add the hook
   TMP=$(mktemp)
   jq --arg cmd "bash \"$HOOK_DST\"" '
     .hooks.PreToolUse = (.hooks.PreToolUse // []) + [{
@@ -100,7 +109,25 @@ else
       }]
     }]
   ' "$SETTINGS_TO_UPDATE" > "$TMP" && mv "$TMP" "$SETTINGS_TO_UPDATE"
-  echo "[OK]   Hook registered in $SETTINGS_TO_UPDATE"
+  echo "[OK]   PreToolUse hook registered in $SETTINGS_TO_UPDATE"
+fi
+
+# Check if PostToolUse notify hook already registered
+if grep -q "bg-agent-notify" "$SETTINGS_TO_UPDATE" 2>/dev/null; then
+  echo "[SKIP] PostToolUse notify hook already registered"
+else
+  TMP=$(mktemp)
+  jq --arg cmd "bash \"$NOTIFY_DST\"" '
+    .hooks.PostToolUse = (.hooks.PostToolUse // []) + [{
+      "matcher": "",
+      "hooks": [{
+        "type": "command",
+        "command": $cmd,
+        "timeout": 5
+      }]
+    }]
+  ' "$SETTINGS_TO_UPDATE" > "$TMP" && mv "$TMP" "$SETTINGS_TO_UPDATE"
+  echo "[OK]   PostToolUse notify hook registered in $SETTINGS_TO_UPDATE"
 fi
 
 # --- Background tracking dir ---

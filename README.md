@@ -21,6 +21,7 @@ Normally `Agent()` tool calls consume Claude Code LLM quota. This system instead
 - **Background mode** (`[bg]`) — spawns and returns immediately with PID
 - **Concurrency limit** — max 3 simultaneous background agents
 - **Completion notifications** — `notify-send` desktop notification on finish
+- **Auto-reporting** — PostToolUse hook detects completed agents and reports inline
 - **Completion tracking** — `/tmp/claude-bg-agents/{ts}.done` with exit code
 - **Auto cleanup** — stale tracking files and logs (>24h) cleaned on each invocation
 
@@ -113,7 +114,9 @@ Wait for one to finish (check /tmp/claude-bg-agents/*.done) then retry.
 
 ```
 ~/.claude/
-├── hooks/external-agent-intercept.sh    # hook script
+├── hooks/
+│   ├── external-agent-intercept.sh    # PreToolUse — dispatch external CLI
+│   └── bg-agent-notify.sh             # PostToolUse — report completions
 ├── agents/
 │   ├── kimi-coder.md
 │   ├── gemini-coder.md
